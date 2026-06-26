@@ -222,13 +222,13 @@ class SheetsWriter:
                 sparkline_formula,
                 getattr(row, "name", ""),
                 getattr(row, "sector", ""),
-                getattr(row, "weight_pct", ""),
-                initial_weight,
+                float(getattr(row, "weight_pct", 0)) / 100.0 if getattr(row, "weight_pct", "") != "" else "",
+                float(initial_weight) / 100.0 if initial_weight != "" else "",
                 cumulative_change_pct,
                 getattr(row, "market_value", ""),
                 getattr(row, "quantity", ""),
                 getattr(row, "price", ""),
-                prev_weight,
+                float(prev_weight) / 100.0 if prev_weight != "" else "",
                 weight_change_pct,
                 status,
                 getattr(row, "as_of_date", ""),
@@ -239,15 +239,15 @@ class SheetsWriter:
         ws.update(values=rows, range_name="A1", value_input_option='USER_ENTERED')
         self._rate_limit()
 
-        # Sütun formatlama (Ağırlık değişimi yüzdeleri için G ve M kolonları)
+        # Sütun formatlama (Ağırlık yüzdeleri için F, G, H, L, M kolonları)
         try:
-            ws.format("H2:H", {
+            ws.format("F2:H", {
                 "numberFormat": {
                     "type": "PERCENT",
                     "pattern": "0.00%"
                 }
             })
-            ws.format("M2:M", {
+            ws.format("L2:M", {
                 "numberFormat": {
                     "type": "PERCENT",
                     "pattern": "0.00%"
