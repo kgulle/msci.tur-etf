@@ -858,7 +858,7 @@ class SheetsWriter:
         self.write_ai_summary(analysis, curr_date, prev_date)
         
         # 13. Risk Paneli (HHI, Volatilite, Konsantrasyon)
-        self.write_risk_panel(df)
+        self.write_risk_panel(curr_df)
 
         logger.info("✅ Tüm Google Sheets güncellemeleri tamamlandı!\n")
 
