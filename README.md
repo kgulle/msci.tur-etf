@@ -1,129 +1,84 @@
-# TUR ETF Portfoy Takip Sistemi
+# 📈 TUR ETF Algoritmik Portföy Takip & Alpha Analiz Sistemi
 
-iShares MSCI Turkey ETF (TUR) portfoy degisikliklerini gunluk olarak takip eden,
-onceki gun ile karsilastirma yapan ve sonuclari Google Sheets'e yazan otomatik sistem.
+Bu proje, BlackRock (iShares) **MSCI Turkey ETF (TUR)** fonunun günlük portföy değişikliklerini analiz eden, BIST 100 endeksine karşı "Alpha" (ekstra getiri) stratejileri üreten ve sonuçları otomatik olarak **Google Sheets** tablosuna aktaran gelişmiş bir finansal veri analiz sistemidir.
 
----
-
-## Ozellikler
-
-- BlackRock API'den gunluk portfoy verisi cekilmesi
-- Bir onceki is gunuyle agirlik karsilastirmasi
-- Yeni giren / cikan hisse tespiti
-- Sektor bazli analiz
-- 8 farkli sekmeli Google Sheets entegrasyonu
-- Windows Task Scheduler ile gunluk otomatik calistirma
-- Geriye donuk (backfill) veri destegi
+🌟 **Canlı Takip Tablosu:** [Google Sheets - TUR ETF Portföy Analizi](https://docs.google.com/spreadsheets/d/1tg5OBvX_ohCrxdiz_2JvtQxTPKmE-hNW27C2WGxH7n0/edit)
 
 ---
 
-## Kurulum
+## 🚀 Projenin Amacı ve Felsefesi
 
-### 1. Python Bagimliliklarini Yukle
+TUR ETF, Türkiye piyasasına yatırım yapan 350 Milyon Doların üzerinde devasa bir yabancı fondur. Ancak fon, ağırlıklı olarak "Market-Cap" (Büyüklük) odaklı olduğu için getiri olarak genellikle BIST100'ü birebir taklit eder. 
 
+**Peki BIST100'ü nasıl yenebiliriz?**
+Bu proje, devasa BlackRock fonunun "Hantallığını" kopyalamak yerine, **"Hareketlerini ve Kararlarını"** kopyalamak için geliştirilmiştir:
+1. **Kurumsal Kuluçka:** Yabancı fonun portföye yepyeni eklediği (yeni kan) hisseleri anında tespit edip trendin ilk adımlarını yakalar.
+2. **Dip Avcılığı:** Fiyat düştükçe fonun "inatla" lot miktarını artırdığı (Negatif Korelasyon) hisseleri tespit eder.
+3. **Erken Kaçış:** BIST 100 yatırımcılarının inatla tuttuğu hisselerde, yabancı fonun sessiz sedasız "Gerçek Satış" yaptığı şirketleri göstererek zararı erken kesmemizi sağlar.
+
+---
+
+## 📊 Google Sheets Analiz Sekmeleri
+
+Sistem verileri analiz edip şu anda aktif olan **13 farklı analitik sekmeye** basar:
+
+| Sekme | Açıklama |
+|-------|----------|
+| **📖 Kılavuz** | Sistemin nasıl çalıştığını ve tabloların nasıl okunması gerektiğini anlatan rehber. |
+| **💡 Yatırım Stratejisi** | BIST100'ü yenmek için kullanabileceğiniz 4 ayaklı Alpha stratejisi (Kuluçka, Negatif Korelasyon vb.) |
+| **📊 Güncel Portföy** | Fonun 70 hisselik anlık portföyü, günlük/kümülatif ağırlık değişimleri, renkli AL/SAT uyarıları ve *trend grafikleri*. |
+| **📉 Korelasyon Analizi** | Hisse fiyat değişimleri ile fonun alış/satış reaksiyonlarını hesaplayıp doğrudan **AL/SAT/TUT** aksiyon önerileri sunar. |
+| **🎯 Gelişmiş Sinyaller** | Günlük fon akışı ve "Anormal" lot değişimlerini tespit edip alarm üreten Quant Radarı. |
+| **🤖 Yapay Zeka Özeti** | Son 24 saatte olan her şeyi metin tabanlı olarak (Sadece fiyatla artanlar, Gerçekten satılanlar vb.) insan dilinde özetler. |
+| **⚖️ BIST100 vs TUR** | Fonun Amerikan Doları (USD) bazındaki tarihsel performansı ile XU100'ün USD bazlı getirisini karşılaştıran görsel grafikler. |
+| **⏳ Pozisyon Getirileri** | Bir hisse fona ilk girdiği günden çıktığı güne kadar fonun o hisseden tam olarak yüzde kaç kâr/zarar ettiğini hesaplar. |
+| **📈 / 📉 Pozisyon Artışları** | Ağırlığı artırılan veya azaltılan hisselerin geçmişten bugüne anlık bildirimleri. |
+| **🏭 Sektör Trendleri** | Fonun bankacılık, sanayi vb. hangi sektörlere para kaydırdığını takip eden Matris. |
+
+---
+
+## ⚙️ Kurulum ve Otomasyon
+
+Projeyi yerel makinenizde çalıştırmak ve günlük otomatik olarak güncellemek için:
+
+### 1. Gereksinimleri Yükleyin
 ```bash
 pip install -r requirements.txt
 ```
 
-### 2. Google Sheets Baglantisini Kur
-
+### 2. Google Sheets Bağlantısını Kurun
+Bu sihirbaz, Google Cloud üzerinde bir service account açıp tablonuza yetki vermenizi sağlar.
 ```bash
 python setup_google_sheets.py
 ```
 
-Bu sihirbaz size adim adim rehberlik eder:
-- Google Cloud'da service account olusturma
-- API izinleri aktiflestirilmesi
-- Spreadsheet'e erisim verilmesi
-- Sekme yapisinin olusturulmasi
-
-### 3. Geecmis Veri Yukle (90 Gunluk Backfill)
-
-```bash
-python main.py --backfill
-```
-
-### 4. Windows Task Scheduler Kur (Gunluk 09:00 Otomatik Calistirma)
-
+### 3. Otomatik Görev Zamanlayıcı (Task Scheduler)
+Windows Görev Zamanlayıcı'ya (Task Scheduler) komut ekleyerek sistemin her iş günü API'den verileri otomatik çekip bulut tablosunu güncellemesini sağlar.
 ```bash
 python setup_task_scheduler.py
 ```
 
----
-
-## Kullanim
-
+### 4. Manuel Kullanım
 ```bash
-# En son gecerli is gunu verisini cek ve analiz et
+# Sadece bugünkü verileri analiz et ve Sheets'e yaz
 python main.py
 
-# Belirli bir tarih icin
+# Belirli bir tarihin verisini çek
 python main.py --date 20260624
 
-# Son 30 gunu backfill
-python main.py --backfill --days 30
-
-# Google Sheets'e yazmadan sadece yerel analiz
-python main.py --no-sheets
-
-# Task Scheduler gorevini kaldir
-python setup_task_scheduler.py --remove
+# Geçmiş 90 günlük verileri çek ve tüm matrisi baştan yarat (Backfill)
+python main.py --backfill --days 90
 ```
 
 ---
 
-## Google Sheets Yapisi
+## 🏗️ Mimari Yapı
 
-| Sekme | Aciklama |
-|-------|----------|
-| Guncel Portfoy | Her gun yenilenen mevcut holdings listesi |
-| Degisim Gecmisi | Her gunun ozet karsilastirma satiri |
-| Pozisyon Artislari | Agirlik artan tum hisseler (kumulatif) |
-| Pozisyon Dususleri | Agirlik azalan tum hisseler (kumulatif) |
-| Yeni Girenler | ETF'e yeni eklenen hisseler |
-| Cikanlar | ETF'den cikarilan hisseler |
-| Ham Veri | Tum tarihsel raw data |
-| Sektor Analizi | Sektor bazli agirlik degisimleri |
+- `main.py` : Sistemin orkestrasyonu.
+- `src/fetcher.py` : BlackRock API'den tarihsel veri (.csv) indirilmesi.
+- `src/analyzer.py` : Pandas kullanılarak ağırlık, lot farkları, getiriler ve korelasyonların hesaplanması.
+- `src/sheets_writer.py` : Hazırlanan devasa analizlerin Google Sheets API (gspread) kullanılarak biçimlendirmelerle beraber buluta yazılması.
+- `data/` : İndirilen günlük raw CSV dosyaları ve değişim algoritmalarının JSON formatında tutulduğu depo.
 
 ---
-
-## Proje Yapisi
-
-```
-TUR-analiz/
-├── main.py                    # Ana giris noktasi
-├── setup_google_sheets.py     # Google Sheets kurulum sihirbazi
-├── setup_task_scheduler.py    # Windows Task Scheduler kurulumu
-├── requirements.txt           # Python bagimliliklari
-├── .env                       # Konfigurasyonlar (gizli)
-├── src/
-│   ├── fetcher.py             # BlackRock API veri cekilmesi
-│   ├── analyzer.py            # Portfoy degisiklik analizi
-│   ├── sheets_writer.py       # Google Sheets yazicisi
-│   └── logger.py              # Loglama yapisi
-├── data/
-│   ├── snapshots/             # Gunluk CSV snapshot'lar (YYYYMMDD.csv)
-│   └── changes/               # Gunluk degisim JSON raporlari
-├── credentials/               # Service account JSON (gizli, git'e eklenmez)
-└── logs/                      # Gunluk log dosyalari
-```
-
----
-
-## Google Sheets Baglantisi Olmadan Test
-
-Service account kurulmadan once sistemin calisip calismdigini dogrulamak icin:
-
-```bash
-python main.py --no-sheets
-```
-
-Snapshot'lar `data/snapshots/` dizinine kaydedilir, degisim raporlari `data/changes/` dizinine JSON olarak yazilir.
-
----
-
-## Kaynak
-
-- ETF Sayfasi: https://www.ishares.com/us/products/239689/ishares-msci-turkey-etf
-- BlackRock API: asOfDate parametresi ile YYYYMMDD formatinda tarih girin
-- Google Sheets Tablosu: https://docs.google.com/spreadsheets/d/1tg5OBvX_ohCrxdiz_2JvtQxTPKmE-hNW27C2WGxH7n0
+*Geliştirici: [kgulle](https://github.com/kgulle)*
