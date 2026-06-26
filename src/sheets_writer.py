@@ -1873,6 +1873,7 @@ class SheetsWriter:
             
         ws.clear()
         ws.update(values=rows, range_name="A1", value_input_option='USER_ENTERED')
+        ws.set_basic_filter(f"A1:I{len(rows)}")
         
         try:
             # Fiyat formatı (E ve G sütunları)
