@@ -1283,8 +1283,8 @@ class SheetsWriter:
         lines.append(["Lot Alımı ile Fiyat Artışı", f"{overall_corr:.3f}", yorum, ""])
         lines.append(["", "", "", ""])
         
-        lines.append(["İLK 20 HİSSE BAZINDA KORELASYONLAR", "", "", ""])
-        lines.append(["Tiker", "Şirket", "Alım/Fiyat Korelasyonu", "Analiz Yorumu"])
+        lines.append(["İLK 20 HİSSE BAZINDA KORELASYONLAR", "", "", "", ""])
+        lines.append(["Tiker", "Şirket", "Alım/Fiyat Korelasyonu", "Analiz Yorumu", "Aksiyon Önerisi"])
         
         for ticker in top_tickers:
             t_df = analysis_data[analysis_data["ticker"] == ticker]
@@ -1294,27 +1294,33 @@ class SheetsWriter:
                 if math.isnan(corr):
                     corr_str = "N/A"
                     yorum_str = "Yeterli veri veya dalgalanma yok."
+                    aksiyon = "⚪ NÖTR"
                 else:
                     corr_str = f"{corr:.3f}"
                     if corr < -0.5:
                         yorum_str = "Fiyat düştüğünde GÜÇLÜ ALIM yapıyor."
+                        aksiyon = "🟢 GÜÇLÜ AL (Dipten Topla)"
                     elif corr < -0.1:
                         yorum_str = "Fiyat düştüğünde ALIM eğilimi var."
+                        aksiyon = "🟢 AL (Düşüş Fırsatı)"
                     elif corr > 0.5:
                         yorum_str = "Fiyat yükseldiğinde GÜÇLÜ ALIM yapıyor."
+                        aksiyon = "🚀 GÜÇLÜ AL (Momentum Sörfü)"
                     elif corr > 0.1:
                         yorum_str = "Fiyat yükseldiğinde ALIM eğilimi var."
+                        aksiyon = "🟡 TUT (Trend Takibi)"
                     else:
                         yorum_str = "Belirgin bir işlem mantığı (korelasyon) yok."
+                        aksiyon = "⚪ NÖTR"
                         
                 name = latest_df[latest_df["ticker"] == ticker].iloc[0]["name"]
-                lines.append([ticker, name, corr_str, yorum_str])
+                lines.append([ticker, name, corr_str, yorum_str, aksiyon])
                 
         ws.clear()
         ws.update(values=lines, range_name="A1", value_input_option='USER_ENTERED')
         
         try:
-            ws.format("A1:D1", {
+            ws.format("A1:E1", {
                 "backgroundColor": {"red": 0.2, "green": 0.4, "blue": 0.6},
                 "textFormat": {"bold": True, "fontSize": 14, "foregroundColor": {"red": 1, "green": 1, "blue": 1}}
             })
@@ -1322,10 +1328,13 @@ class SheetsWriter:
                 "backgroundColor": {"red": 0.3, "green": 0.3, "blue": 0.3},
                 "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}}
             })
-            ws.format("A8:D8", {
+            ws.format("A8:E8", {
                 "backgroundColor": {"red": 0.3, "green": 0.3, "blue": 0.3},
                 "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}}
             })
+            
+            # Aksiyon Sütununu Ortalama
+            ws.format("E9:E", {"horizontalAlignment": "CENTER", "textFormat": {"bold": True}})
         except Exception as e:
             logger.warning(f"Korelasyon formatlanamadi: {e}")
             
