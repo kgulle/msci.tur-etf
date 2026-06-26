@@ -39,6 +39,7 @@ SHEET_NAMES = {
     "revisions":    "🔄 Dönemsel Revizyonlar",
     "benchmark":    "⚖️ BIST100 vs TUR",
     "trades":       "⏳ Pozisyon Getirileri",
+    "risk_panel":   "🛡️ Risk Paneli",
 }
 
 # Gorsellestirme icin sabit renkler
@@ -62,6 +63,7 @@ SHEET_COLORS = {
     "revisions":   {"red": 0.55, "green": 0.20, "blue": 0.65},
     "benchmark":   {"red": 0.15, "green": 0.45, "blue": 0.85},
     "trades":      {"red": 0.80, "green": 0.60, "blue": 0.10},
+    "risk_panel":  {"red": 0.60, "green": 0.10, "blue": 0.10},
 }
 
 
@@ -854,8 +856,12 @@ class SheetsWriter:
         
         # 12. Yapay Zeka Özeti
         self.write_ai_summary(analysis, curr_date, prev_date)
+        
+        # 13. Risk Paneli (HHI, Volatilite, Konsantrasyon)
+        self.write_risk_panel(df)
 
         logger.info("✅ Tüm Google Sheets güncellemeleri tamamlandı!\n")
+
 
     def write_ai_summary(self, analysis: dict, curr_date: date, prev_date: date):
         """🤖 Yapay Zeka Özeti sekmesini günceller."""
@@ -1317,21 +1323,37 @@ class SheetsWriter:
         lines.append(["Lot Alımı ile Fiyat Artışı", f"{overall_corr:.3f}", yorum, ""])
         lines.append(["", "", "", ""])
         
-        lines.append(["İLK 20 HİSSE BAZINDA KORELASYONLAR", "", "", "", ""])
-        lines.append(["Tiker", "Şirket", "Alım/Fiyat Korelasyonu", "Analiz Yorumu", "Aksiyon Önerisi"])
+        lines.append(["İLK 20 HİSSE BAZINDA KORELASYONLAR", "", "", "", "", "", ""])
+        lines.append(["Tiker", "Şirket", "Gözlem (N)", "Alım/Fiyat Korelasyonu", "p-value", "Analiz Yorumu", "Aksiyon Önerisi"])
         
         for ticker in top_tickers:
             t_df = analysis_data[analysis_data["ticker"] == ticker]
-            if len(t_df) > 5:
-                corr = t_df["qty_change_pct"].corr(t_df["price_change_pct"])
+            n_obs = len(t_df)
+            if n_obs >= 10:  # En az 10 gözlem zorunlu (istatistiksel hesap için)
+                try:
+                    from scipy import stats as sp_stats
+                    corr, p_value = sp_stats.pearsonr(t_df["qty_change_pct"], t_df["price_change_pct"])
+                except Exception:
+                    corr = t_df["qty_change_pct"].corr(t_df["price_change_pct"])
+                    p_value = None
                 
                 if math.isnan(corr):
                     corr_str = "N/A"
+                    p_str = "N/A"
                     yorum_str = "Yeterli veri veya dalgalanma yok."
                     aksiyon = "⚪ NÖTR"
                 else:
                     corr_str = f"{corr:.3f}"
-                    if corr < -0.5:
+                    p_str = f"{p_value:.3f}" if p_value is not None else "N/A"
+                    
+                    # İstatistiksel anlamsızlık veya yetersiz gözlem kontrolu
+                    if n_obs < 30:
+                        yorum_str = f"⚠️ Az Gözlem (N={n_obs} < 30). Korelasyon güvenilir değil."
+                        aksiyon = "⚪ Yetersiz Veri"
+                    elif p_value is not None and p_value > 0.05:
+                        yorum_str = f"Korelasyon istatistiksel olarak ANLAMSIZ (p={p_value:.3f} > 0.05). Sonuç gürültü."
+                        aksiyon = "⚪ İstatistiksel Anlamsız"
+                    elif corr < -0.5:
                         yorum_str = "Fiyat düştüğünde GÜÇLÜ ALIM yapıyor."
                         aksiyon = "🟢 GÜÇLÜ AL (Dipten Topla)"
                     elif corr < -0.1:
@@ -1346,9 +1368,14 @@ class SheetsWriter:
                     else:
                         yorum_str = "Belirgin bir işlem mantığı (korelasyon) yok."
                         aksiyon = "⚪ NÖTR"
-                        
-                name = latest_df[latest_df["ticker"] == ticker].iloc[0]["name"]
-                lines.append([ticker, name, corr_str, yorum_str, aksiyon])
+            else:
+                corr_str = "N/A"
+                p_str = "N/A"
+                yorum_str = f"⚠️ Çok Az Gözlem (N={n_obs}). Hesaplama yapılamaz."
+                aksiyon = "⚪ Yetersiz Veri"
+                    
+            name = latest_df[latest_df["ticker"] == ticker].iloc[0]["name"]
+            lines.append([ticker, name, n_obs, corr_str, p_str, yorum_str, aksiyon])
                 
         ws.clear()
         ws.update(values=lines, range_name="A1", value_input_option='USER_ENTERED')
@@ -1962,7 +1989,8 @@ class SheetsWriter:
             "Tiker", "📈 Fiyat Trendi", "Şirket Adı", "Durum", 
             "Fona Giriş Tarihi", "Giriş Fiyatı (USD)", "Giriş Ağırlığı (%)",
             "Fondan Çıkış Tarihi", "Çıkış Fiyatı (USD)", "Çıkış Ağırlığı (%)",
-            "Net Getiri (USD Bazlı)", "Ağırlık Değişimi (pp)", "Elde Tutma Süresi (Gün)"
+            "Net Getiri (USD Bazlı)", "📊 Ağırlıklı Katkı Getirisi", "📅 Yıllıklandırılmış Getiri",
+            "Ağırlık Değişimi (pp)", "Elde Tutma Süresi (Gün)"
         ]
         rows = [headers]
         for i, t in enumerate(trades):
@@ -1981,70 +2009,53 @@ class SheetsWriter:
                 t.get("exit_price", 0),
                 t.get("exit_weight", 0) / 100.0,
                 t.get("return_pct", 0),
+                t.get("weighted_contribution_pct", 0),
+                t.get("annualized_return_pct", 0),
                 t.get("weight_change_pp", 0) / 100.0,
                 t.get("days_held", 0)
             ])
             
         ws.clear()
         ws.update(values=rows, range_name="A1", value_input_option='USER_ENTERED')
-        ws.set_basic_filter(f"A1:M{len(rows)}")
+        ws.set_basic_filter(f"A1:O{len(rows)}")
         
         try:
             # Fiyat formatı (F ve I sütunları)
             ws.format("F2:F", {"numberFormat": {"type": "NUMBER", "pattern": "#,##0.00"}})
             ws.format("I2:I", {"numberFormat": {"type": "NUMBER", "pattern": "#,##0.00"}})
             
-            # Yüzde formatı (G, J, K, L sütunları)
-            ws.format("G2:G", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
-            ws.format("J2:J", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
-            ws.format("K2:K", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
-            ws.format("L2:L", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
+            # Yüzde formatı (G, J, K, L, M, N sütunları)
+            for col in ["G", "J", "K", "L", "M", "N"]:
+                ws.format(f"{col}2:{col}", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
             
             # Başlık
-            ws.format("A1:M1", {
+            ws.format("A1:O1", {
                 "backgroundColor": {"red": 0.80, "green": 0.60, "blue": 0.10},
                 "textFormat": {"bold": True, "foregroundColor": {"red": 0, "green": 0, "blue": 0}}
             })
             
-            # Koşullu biçimlendirme - Durum Sütunu (Aktif vs Kapalı)
             ws.format("D2:D", {"horizontalAlignment": "CENTER"})
             
-            # Otomatik kolon ayarı
             body = {
                 "requests": [
                     {
                         "updateDimensionProperties": {
-                            "range": {
-                                "sheetId": ws.id,
-                                "dimension": "COLUMNS",
-                                "startIndex": 1,
-                                "endIndex": 2
-                            },
+                            "range": {"sheetId": ws.id, "dimension": "COLUMNS", "startIndex": 1, "endIndex": 2},
                             "properties": {"pixelSize": 180},
                             "fields": "pixelSize"
                         }
                     },
                     {
                         "updateDimensionProperties": {
-                            "range": {
-                                "sheetId": ws.id,
-                                "dimension": "COLUMNS",
-                                "startIndex": 2,
-                                "endIndex": 3
-                            },
+                            "range": {"sheetId": ws.id, "dimension": "COLUMNS", "startIndex": 2, "endIndex": 3},
                             "properties": {"pixelSize": 180},
                             "fields": "pixelSize"
                         }
                     },
                     {
                         "updateDimensionProperties": {
-                            "range": {
-                                "sheetId": ws.id,
-                                "dimension": "COLUMNS",
-                                "startIndex": 4,
-                                "endIndex": 12
-                            },
-                            "properties": {"pixelSize": 120},
+                            "range": {"sheetId": ws.id, "dimension": "COLUMNS", "startIndex": 4, "endIndex": 14},
+                            "properties": {"pixelSize": 130},
                             "fields": "pixelSize"
                         }
                     }
@@ -2057,3 +2068,107 @@ class SheetsWriter:
             
         self._rate_limit()
         logger.info(f"  ✅ '{SHEET_NAMES['trades']}' güncellendi")
+
+    def write_risk_panel(self, df: pd.DataFrame, snapshot_dir: str = "data/snapshots"):
+        """🛡️ Risk Paneli sekmesini günceller. Volatilite, konsantrasyon ve HHI metrikleri."""
+        ws = self._get_sheet("risk_panel")
+        if ws is None:
+            return
+
+        import math
+        from pathlib import Path
+
+        # --- Fiyat Getirilerini Hesapla (Son 30 Günlük Volatilite) ---
+        path = Path(snapshot_dir)
+        all_dfs = []
+        for f in sorted(path.glob("*.csv"))[-35:]:  # Son 35 dosya yeter
+            try:
+                d_obj = datetime.strptime(f.stem, "%Y%m%d").date()
+                tmp = pd.read_csv(f)
+                tmp.columns = [c.lower().strip() for c in tmp.columns]
+                tmp["date"] = d_obj
+                tmp["price_val"] = pd.to_numeric(tmp.get("price", pd.Series()), errors="coerce").fillna(0)
+                all_dfs.append(tmp[["ticker", "date", "price_val"]].dropna(subset=["ticker"]))
+            except Exception:
+                continue
+
+        volatility_map = {}
+        if len(all_dfs) >= 5:
+            price_df = pd.concat(all_dfs, ignore_index=True).sort_values(["ticker", "date"])
+            price_df["daily_ret"] = price_df.groupby("ticker")["price_val"].pct_change()
+            vol_series = price_df.groupby("ticker")["daily_ret"].std()
+            volatility_map = vol_series.to_dict()
+
+        # --- Portföy Metrikleri ---
+        total_weight = df["weight_pct"].sum() if "weight_pct" in df.columns else 100.0
+        weights = df["weight_pct"].fillna(0) if "weight_pct" in df.columns else pd.Series()
+        
+        # HHI (Herfindahl-Hirschman Index): Düşük = Çeşitlendirilmiş, Yüksek = Konsantre
+        # Hesaplama: sum(w_i^2) where w_i = ağırlık/100
+        hhi = sum((w / 100.0) ** 2 for w in weights) * 10000  # 0-10000 arası
+        hhi_yorum = "🟢 İyi Çeşitlendirilmiş" if hhi < 500 else ("🟡 Orta Konsantrasyon" if hhi < 1500 else "🔴 Yüksek Konsantrasyon")
+        
+        top10_weight = weights.nlargest(10).sum()
+        top5_weight = weights.nlargest(5).sum()
+        max_weight_row = df.loc[df["weight_pct"].idxmax()] if not df.empty and "weight_pct" in df.columns else None
+
+        lines = []
+        lines.append(["🛡️ RİSK PANELİ — PORTFÖY KONSANTRASYONu VE VOLATİLİTE ANALİZİ", ""])
+        lines.append(["", ""])
+        lines.append(["📊 GENEL PORTFÖY RİSK METRİKLERİ", ""])
+        lines.append(["Metrik", "Değer", "Yorum"])
+        lines.append(["HHI Konsantrasyon Skoru", f"{hhi:.0f} / 10000", hhi_yorum])
+        lines.append(["Top-5 Hisse Ağırlığı", f"{top5_weight:.2f}%", "⚠️ Yüksek" if top5_weight > 40 else "✅ Normal"])
+        lines.append(["Top-10 Hisse Ağırlığı", f"{top10_weight:.2f}%", "⚠️ Yüksek" if top10_weight > 60 else "✅ Normal"])
+        lines.append(["Toplam Hisse Sayısı", f"{len(df)}", ""])
+        if max_weight_row is not None:
+            max_ticker = max_weight_row.get("ticker", "")
+            max_w = max_weight_row.get("weight_pct", 0)
+            uyari = "🔴 TEK HİSSE ALARMI! > %10" if max_w > 10 else "✅ Normal"
+            lines.append([f"En Büyük Pozisyon", f"{max_ticker}: %{max_w:.2f}", uyari])
+        lines.append(["", "", ""])
+        lines.append(["📈 HİSSE BAZINDA VOLATİLİTE (Son ~30 Gün)", "", ""])
+        lines.append(["Tiker", "Şirket", "Ağırlık (%)", "Günlük Volatilite (std)", "Risk Seviyesi"])
+        
+        df_sorted = df.sort_values("weight_pct", ascending=False) if "weight_pct" in df.columns else df
+        for _, row in df_sorted.head(30).iterrows():
+            ticker = row.get("ticker", "")
+            name = str(row.get("name", ""))[:40]
+            weight = row.get("weight_pct", 0)
+            vol = volatility_map.get(ticker, None)
+            if vol is None or math.isnan(vol):
+                vol_str = "N/A"
+                risk = "⚪ Veri Yok"
+            else:
+                vol_str = f"{vol*100:.2f}%"
+                if vol > 0.04:
+                    risk = "🔴 Yüksek Risk"
+                elif vol > 0.02:
+                    risk = "🟡 Orta Risk"
+                else:
+                    risk = "🟢 Düşük Risk"
+            lines.append([ticker, name, weight / 100.0, vol_str, risk])
+
+        ws.clear()
+        ws.update(values=lines, range_name="A1", value_input_option='USER_ENTERED')
+
+        try:
+            ws.format("A1:B1", {
+                "backgroundColor": {"red": 0.60, "green": 0.10, "blue": 0.10},
+                "textFormat": {"bold": True, "fontSize": 13, "foregroundColor": {"red": 1, "green": 1, "blue": 1}}
+            })
+            ws.format("A3:A3", {"textFormat": {"bold": True, "fontSize": 11}})
+            ws.format("A4:C4", {
+                "backgroundColor": {"red": 0.3, "green": 0.3, "blue": 0.3},
+                "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}}
+            })
+            ws.format("A12:E12", {
+                "backgroundColor": {"red": 0.3, "green": 0.3, "blue": 0.3},
+                "textFormat": {"bold": True, "foregroundColor": {"red": 1, "green": 1, "blue": 1}}
+            })
+            ws.format("C13:C", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
+        except Exception as e:
+            logger.warning(f"Risk Paneli formatlanamadı: {e}")
+
+        self._rate_limit()
+        logger.info(f"  ✅ '{SHEET_NAMES['risk_panel']}' güncellendi")

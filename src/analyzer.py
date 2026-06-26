@@ -87,10 +87,17 @@ class PortfolioChange:
                     "description": f"Hisse adedi tek günde %{round(abs(qty_change)/pq*100, 1)} değişti!"
                 })
 
-            if qty_change > 0:
-                reason = "🟢 Gerçek Fon Alımı"
-            elif qty_change < 0:
-                reason = "🔴 Gerçek Fon Satışı"
+            # Gerçek karar vs AUM etkisi ayrımı:
+            # BlackRock market-cap weighted fon olduğu için fona para girince
+            # tüm hisselerin lot miktarı otomatik artar (AUM etkisi).
+            # Gerçek bir alım/satım kararı ancak ağırlık değişimiyle teyitlenebilir.
+            AUM_THRESHOLD_PP = 0.05  # 0.05 puanlık ağırlık eşiği
+            if qty_change > 0 and change_pp >= AUM_THRESHOLD_PP:
+                reason = "🟢 Gerçek Fon Alımı (Ağırlık Artışlı)"
+            elif qty_change < 0 and change_pp <= -AUM_THRESHOLD_PP:
+                reason = "🔴 Gerçek Fon Satışı (Ağırlık Düşüşlü)"
+            elif qty_change != 0 and abs(change_pp) < AUM_THRESHOLD_PP:
+                reason = "🔄 AUM Etkisi (Oransal Rebalance — Karar Değil)"
             elif change_pp > 0:
                 reason = "📈 Sadece Fiyat Etkisi"
             elif change_pp < 0:
@@ -307,15 +314,15 @@ class PortfolioChange:
                         self.quant_signals.append({
                             "ticker": ticker,
                             "name": row.get("name", ""),
-                            "signal_type": "🟢 GOLDEN CROSS",
-                            "description": "Hisse ağırlığı 20 günlük hareketli ortalamayı (SMA-20) YUKARI kesti."
+                            "signal_type": "🟢 AĞIRLIK ARTIŞ İVMESİ (SMA-20 Üstü)",
+                            "description": "Fonun bu hissedeki ağırlığı, 20 günlük ağırlık ortalamasını YUKARI geçti. Sistematik alım ivmesi sinyali."
                         })
                     elif curr_w < sma20_curr and prev_w >= sma20_prev:
                         self.quant_signals.append({
                             "ticker": ticker,
                             "name": row.get("name", ""),
-                            "signal_type": "🔴 DEATH CROSS",
-                            "description": "Hisse ağırlığı 20 günlük hareketli ortalamayı (SMA-20) AŞAĞI kesti."
+                            "signal_type": "🔴 AĞIRLIK DÜŞÜŞ İVMESİ (SMA-20 Altı)",
+                            "description": "Fonun bu hissedeki ağırlığı, 20 günlük ağırlık ortalamasını AŞAĞI geçti. Sistematik azaltım sinyali."
                         })
         except Exception as e:
             logger.error(f"Sinyal hesaplama hatasi: {e}")
@@ -512,9 +519,22 @@ def calculate_trade_performance(snapshot_dir: str = "data/snapshots") -> list:
         weight_change_pp = xw - ew
         days_held = (t["exit_date"] - t["entry_date"]).days
         
-        # Ayni gun girip cikanlar (hata veya kisa trade) gun 1 yapalim division by zero engellemek icin (gerekmese de gorsel icin iyi)
+        # Ayni gun girip cikanlar (hata veya kisa trade) gun 1 yapalim
         if days_held == 0:
             days_held = 1
+        
+        # Ağırlıklı katkı getirisi: Ortalama ağırlık × Fiyat getirisi
+        # Bu metrik, portföy içindeki gerçek etkiyi gösterir.
+        # Büyük pozisyonun %5 getirisi, küçük pozisyonun %50 getirisinden daha değerlidir.
+        avg_weight = (ew + xw) / 2.0
+        weighted_contribution_pct = (avg_weight / 100.0) * ret_pct  # portföy katkısı olarak
+        
+        # Yıllıklandırılmış getiri (basit, bileşik değil)
+        # Formül: (1 + ret)^(365/days) - 1
+        if days_held > 0 and ep > 0:
+            annualized_return_pct = ((1 + ret_pct) ** (365.0 / days_held)) - 1.0
+        else:
+            annualized_return_pct = 0.0
             
         results.append({
             "ticker": t["ticker"],
@@ -525,6 +545,8 @@ def calculate_trade_performance(snapshot_dir: str = "data/snapshots") -> list:
             "exit_date": t["exit_date"].strftime("%Y-%m-%d"),
             "exit_price": xp,
             "return_pct": ret_pct,
+            "weighted_contribution_pct": weighted_contribution_pct,
+            "annualized_return_pct": annualized_return_pct,
             "entry_weight": ew,
             "exit_weight": xw,
             "weight_change_pp": weight_change_pp,
