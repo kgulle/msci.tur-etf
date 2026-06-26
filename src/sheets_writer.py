@@ -1290,12 +1290,12 @@ class SheetsWriter:
             
         master_df = pd.concat(all_dfs, ignore_index=True)
         
-        # Sadece son gunun top 20 hissesini alalim
+        # Tüm hisseleri alalim (büyüküe göre sıralı)
         latest_date = master_df["date"].max()
         latest_df = master_df[master_df["date"] == latest_date].sort_values("weight_pct", ascending=False)
-        top_tickers = latest_df["ticker"].head(20).tolist()
+        all_tickers = latest_df["ticker"].tolist()
         
-        analysis_data = master_df[master_df["ticker"].isin(top_tickers)].copy()
+        analysis_data = master_df[master_df["ticker"].isin(all_tickers)].copy()
         analysis_data = analysis_data.sort_values(["ticker", "date"])
         
         analysis_data["prev_qty"] = analysis_data.groupby("ticker")["qty_val"].shift(1)
@@ -1323,10 +1323,10 @@ class SheetsWriter:
         lines.append(["Lot Alımı ile Fiyat Artışı", f"{overall_corr:.3f}", yorum, ""])
         lines.append(["", "", "", ""])
         
-        lines.append(["İLK 20 HİSSE BAZINDA KORELASYONLAR", "", "", "", "", "", ""])
+        lines.append(["TÜM HİSSELER İÇİN KORELASYON ANALİZİ", "", "", "", "", "", ""])
         lines.append(["Tiker", "Şirket", "Gözlem (N)", "Alım/Fiyat Korelasyonu", "p-value", "Analiz Yorumu", "Aksiyon Önerisi"])
         
-        for ticker in top_tickers:
+        for ticker in all_tickers:
             t_df = analysis_data[analysis_data["ticker"] == ticker]
             n_obs = len(t_df)
             if n_obs >= 10:  # En az 10 gözlem zorunlu (istatistiksel hesap için)
