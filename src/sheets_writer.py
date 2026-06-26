@@ -898,7 +898,7 @@ class SheetsWriter:
         report.append(["📈 SADECE FİYAT ARTIŞIYLA AĞIRLIĞI YÜKSELENLER"])
         if price_effects:
             for x in price_effects[:5]:
-                report.append([f" - {x['ticker']}: Fon yeni hisse ALMADI. Ancak hisse fiyatı {x['price_change_pct']*100:.1f}% yükseldiği için portföy ağırlığı arttı."])
+                report.append([f" - {x['ticker']}: Fon yeni hisse ALMADI. Ancak hisse fiyatı %{x['price_change_pct']:.1f} yükseldiği için portföy ağırlığı arttı."])
         else:
             report.append([" - Sadece fiyat etkisine bağlı bir ağırlık değişimi gözlemlenmedi."])
             
