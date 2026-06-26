@@ -1,0 +1,30 @@
+# Virtual Environments
+venv/
+env/
+.env
+
+# Credentials & API Keys (CRITICAL: DO NOT COMMIT!)
+credentials/
+service_account.json
+client_secret.json
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+
+# Data & Logs
+data/
+logs/
+*.csv
+*.json
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# MacOS
+.DS_Store
