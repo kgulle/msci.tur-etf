@@ -446,6 +446,12 @@ def calculate_trade_performance(snapshot_dir: str = "data/snapshots") -> list:
             except:
                 price = 0.0
                 
+            try:
+                weight_val = row.get("weight_pct") if "weight_pct" in row else row.get("weight (%)", 0)
+                weight = float(weight_val)
+            except:
+                weight = 0.0
+                
             if price == 0.0:
                 # Eger fiyat yoksa kayitlari bozmamak icin atla
                 continue
@@ -459,14 +465,17 @@ def calculate_trade_performance(snapshot_dir: str = "data/snapshots") -> list:
                     "name": name,
                     "entry_date": d,
                     "entry_price": price,
+                    "entry_weight": weight,
                     "last_date": d,
                     "last_price": price,
+                    "last_weight": weight,
                     "status": "Aktif"
                 }
             else:
                 # Guncelleme
                 trades[ticker]["last_date"] = d
                 trades[ticker]["last_price"] = price
+                trades[ticker]["last_weight"] = weight
                 trades[ticker]["name"] = name # Isim guncellemesi (degismisse)
                 
         # Bugun portfoyde olmayanlari bul ve kapat
@@ -476,6 +485,7 @@ def calculate_trade_performance(snapshot_dir: str = "data/snapshots") -> list:
                 trade["status"] = "Kapalı"
                 trade["exit_date"] = trade["last_date"]
                 trade["exit_price"] = trade["last_price"]
+                trade["exit_weight"] = trade["last_weight"]
                 completed_trades.append(trade)
                 exited_tickers.append(ticker)
                 
@@ -487,6 +497,7 @@ def calculate_trade_performance(snapshot_dir: str = "data/snapshots") -> list:
     for ticker, trade in trades.items():
         trade["exit_date"] = trade["last_date"]
         trade["exit_price"] = trade["last_price"]
+        trade["exit_weight"] = trade["last_weight"]
         completed_trades.append(trade)
 
     # Sonuclari listele ve hesaplamalari yap
@@ -494,8 +505,11 @@ def calculate_trade_performance(snapshot_dir: str = "data/snapshots") -> list:
     for t in completed_trades:
         ep = t["entry_price"]
         xp = t["exit_price"]
+        ew = t.get("entry_weight", 0)
+        xw = t.get("exit_weight", 0)
         
         ret_pct = (xp / ep - 1.0) if ep > 0 else 0.0
+        weight_change_pp = xw - ew
         days_held = (t["exit_date"] - t["entry_date"]).days
         
         # Ayni gun girip cikanlar (hata veya kisa trade) gun 1 yapalim division by zero engellemek icin (gerekmese de gorsel icin iyi)
@@ -511,6 +525,9 @@ def calculate_trade_performance(snapshot_dir: str = "data/snapshots") -> list:
             "exit_date": t["exit_date"].strftime("%Y-%m-%d"),
             "exit_price": xp,
             "return_pct": ret_pct,
+            "entry_weight": ew,
+            "exit_weight": xw,
+            "weight_change_pp": weight_change_pp,
             "days_held": days_held
         })
 

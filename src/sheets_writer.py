@@ -1851,52 +1851,55 @@ class SheetsWriter:
             return
 
         headers = [
-            "Tiker", "Şirket Adı", "Durum", 
-            "Fona Giriş Tarihi", "Giriş Fiyatı (USD)", 
-            "Fondan Çıkış Tarihi", "Çıkış Fiyatı (USD)", 
-            "Net Getiri (USD Bazlı)", "Elde Tutma Süresi (Gün)"
+            "Tiker", "📈 Fiyat Trendi", "Şirket Adı", "Durum", 
+            "Fona Giriş Tarihi", "Giriş Fiyatı (USD)", "Giriş Ağırlığı (%)",
+            "Fondan Çıkış Tarihi", "Çıkış Fiyatı (USD)", "Çıkış Ağırlığı (%)",
+            "Net Getiri (USD Bazlı)", "Ağırlık Değişimi (pp)", "Elde Tutma Süresi (Gün)"
         ]
-        
         rows = [headers]
-        for t in trades:
+        for i, t in enumerate(trades):
+            row_num = i + 2
+            sparkline_formula = f'=IFNA(SPARKLINE(INDEX(\'💵 Fiyat Matrisi (USD)\'!E:ZZ; MATCH(A{row_num}; \'💵 Fiyat Matrisi (USD)\'!A:A; 0))); "")'
+            
             rows.append([
                 t.get("ticker", ""),
+                sparkline_formula,
                 t.get("name", ""),
                 t.get("status", ""),
                 t.get("entry_date", ""),
                 t.get("entry_price", 0),
+                t.get("entry_weight", 0) / 100.0,
                 t.get("exit_date", ""),
                 t.get("exit_price", 0),
+                t.get("exit_weight", 0) / 100.0,
                 t.get("return_pct", 0),
+                t.get("weight_change_pp", 0) / 100.0,
                 t.get("days_held", 0)
             ])
             
         ws.clear()
         ws.update(values=rows, range_name="A1", value_input_option='USER_ENTERED')
-        ws.set_basic_filter(f"A1:I{len(rows)}")
+        ws.set_basic_filter(f"A1:M{len(rows)}")
         
         try:
-            # Fiyat formatı (E ve G sütunları)
-            ws.format("E2:E", {
-                "numberFormat": {"type": "NUMBER", "pattern": "#,##0.00"}
-            })
-            ws.format("G2:G", {
-                "numberFormat": {"type": "NUMBER", "pattern": "#,##0.00"}
-            })
+            # Fiyat formatı (F ve I sütunları)
+            ws.format("F2:F", {"numberFormat": {"type": "NUMBER", "pattern": "#,##0.00"}})
+            ws.format("I2:I", {"numberFormat": {"type": "NUMBER", "pattern": "#,##0.00"}})
             
-            # Yüzde formatı (H sütunu)
-            ws.format("H2:H", {
-                "numberFormat": {"type": "PERCENT", "pattern": "0.00%"}
-            })
+            # Yüzde formatı (G, J, K, L sütunları)
+            ws.format("G2:G", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
+            ws.format("J2:J", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
+            ws.format("K2:K", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
+            ws.format("L2:L", {"numberFormat": {"type": "PERCENT", "pattern": "0.00%"}})
             
             # Başlık
-            ws.format("A1:I1", {
+            ws.format("A1:M1", {
                 "backgroundColor": {"red": 0.80, "green": 0.60, "blue": 0.10},
                 "textFormat": {"bold": True, "foregroundColor": {"red": 0, "green": 0, "blue": 0}}
             })
             
             # Koşullu biçimlendirme - Durum Sütunu (Aktif vs Kapalı)
-            ws.format("C2:C", {"horizontalAlignment": "CENTER"})
+            ws.format("D2:D", {"horizontalAlignment": "CENTER"})
             
             # Otomatik kolon ayarı
             body = {
@@ -1918,8 +1921,20 @@ class SheetsWriter:
                             "range": {
                                 "sheetId": ws.id,
                                 "dimension": "COLUMNS",
-                                "startIndex": 3,
-                                "endIndex": 7
+                                "startIndex": 2,
+                                "endIndex": 3
+                            },
+                            "properties": {"pixelSize": 180},
+                            "fields": "pixelSize"
+                        }
+                    },
+                    {
+                        "updateDimensionProperties": {
+                            "range": {
+                                "sheetId": ws.id,
+                                "dimension": "COLUMNS",
+                                "startIndex": 4,
+                                "endIndex": 12
                             },
                             "properties": {"pixelSize": 120},
                             "fields": "pixelSize"
