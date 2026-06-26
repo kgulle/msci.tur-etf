@@ -1837,6 +1837,71 @@ class SheetsWriter:
                 ]
             }
             ws.spreadsheet.batch_update(body)
+            # Çart (Grafik) Ekleme
+            sheet_data = ws.spreadsheet.fetch_sheet_metadata()
+            sheet_props = [s for s in sheet_data['sheets'] if s['properties']['sheetId'] == ws.id]
+            if sheet_props:
+                charts = sheet_props[0].get('charts', [])
+                if len(charts) == 0:
+                    chart_body = {
+                        "requests": [
+                            {
+                                "addChart": {
+                                    "chart": {
+                                        "spec": {
+                                            "title": "Kümülatif Getiri Eğrisi: TUR ETF vs BIST 100",
+                                            "basicChart": {
+                                                "chartType": "LINE",
+                                                "legendPosition": "TOP_LEGEND",
+                                                "axis": [
+                                                    {"position": "BOTTOM_AXIS", "title": "Tarih"},
+                                                    {"position": "LEFT_AXIS", "title": "Getiri"}
+                                                ],
+                                                "domains": [
+                                                    {
+                                                        "domain": {
+                                                            "sourceRange": {
+                                                                "sources": [{"sheetId": ws.id, "startRowIndex": 0, "endRowIndex": 5000, "startColumnIndex": 0, "endColumnIndex": 1}]
+                                                            }
+                                                        }
+                                                    }
+                                                ],
+                                                "series": [
+                                                    {
+                                                        "series": {
+                                                            "sourceRange": {
+                                                                "sources": [{"sheetId": ws.id, "startRowIndex": 0, "endRowIndex": 5000, "startColumnIndex": 5, "endColumnIndex": 6}]
+                                                            }
+                                                        },
+                                                        "targetAxis": "LEFT_AXIS",
+                                                        "colorStyle": {"rgbColor": {"red": 0.1, "green": 0.6, "blue": 0.1}}
+                                                    },
+                                                    {
+                                                        "series": {
+                                                            "sourceRange": {
+                                                                "sources": [{"sheetId": ws.id, "startRowIndex": 0, "endRowIndex": 5000, "startColumnIndex": 6, "endColumnIndex": 7}]
+                                                            }
+                                                        },
+                                                        "targetAxis": "LEFT_AXIS",
+                                                        "colorStyle": {"rgbColor": {"red": 0.8, "green": 0.2, "blue": 0.2}}
+                                                    }
+                                                ],
+                                                "headerCount": 1
+                                            }
+                                        },
+                                        "position": {
+                                            "overlayPosition": {
+                                                "anchorCell": {"sheetId": ws.id, "rowIndex": 1, "columnIndex": 8},
+                                                "widthPixels": 800,
+                                                "heightPixels": 450
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        ]
+                    }
+                    ws.spreadsheet.batch_update(chart_body)
             
         except Exception as e:
             logger.warning(f"Benchmark sekmesi formatlanamadı: {e}")
