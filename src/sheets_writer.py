@@ -255,6 +255,40 @@ class SheetsWriter:
             })
         except:
             pass
+            
+        # Koşullu Biçimlendirme (Artan/Azalan Vurgulama)
+        try:
+            cf_body = {
+                "requests": [
+                    {
+                        "addConditionalFormatRule": {
+                            "rule": {
+                                "ranges": [{"sheetId": ws.id, "startRowIndex": 1, "startColumnIndex": 13, "endColumnIndex": 14}],
+                                "booleanRule": {
+                                    "condition": {"type": "TEXT_CONTAINS", "values": [{"userEnteredValue": "📈 Artan"}]},
+                                    "format": {"backgroundColor": {"red": 0.85, "green": 0.95, "blue": 0.85}, "textFormat": {"bold": True, "foregroundColor": {"red": 0.0, "green": 0.5, "blue": 0.0}}}
+                                }
+                            },
+                            "index": 0
+                        }
+                    },
+                    {
+                        "addConditionalFormatRule": {
+                            "rule": {
+                                "ranges": [{"sheetId": ws.id, "startRowIndex": 1, "startColumnIndex": 13, "endColumnIndex": 14}],
+                                "booleanRule": {
+                                    "condition": {"type": "TEXT_CONTAINS", "values": [{"userEnteredValue": "📉 Azalan"}]},
+                                    "format": {"backgroundColor": {"red": 0.98, "green": 0.85, "blue": 0.85}, "textFormat": {"bold": True, "foregroundColor": {"red": 0.7, "green": 0.0, "blue": 0.0}}}
+                                }
+                            },
+                            "index": 1
+                        }
+                    }
+                ]
+            }
+            ws.spreadsheet.batch_update(cf_body)
+        except Exception as e:
+            logger.warning(f"Kosullu bicimlendirme eklenemedi: {e}")
 
         # Başlık satırı formatı
         ws.format("A1:O1", {
