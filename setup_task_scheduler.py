@@ -16,11 +16,13 @@ from datetime import date
 
 def create_task_scheduler_task(
     task_name: str = "TUR_ETF_Analiz",
-    hour: int = 9,
+    hour: int = 20,
     minute: int = 0,
 ):
     """
     Windows Task Scheduler'a günlük görev ekler.
+    Saat 20:00 olarak ayarlanmıştır — BlackRock kapanış verisini 
+    genellikle bu saate kadar yayınlar.
     """
     project_dir = Path(__file__).parent.absolute()
     python_exe = sys.executable
